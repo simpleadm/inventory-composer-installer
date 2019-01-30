@@ -36,10 +36,12 @@ class InventoryConfiguratorFactory
         $deploymentConfig = $this->getDeploymentConfig($projectDir);
         if ($this->isModulesConfigured($deploymentConfig)) {
             $deploymentConfigWriter = $this->createDeploymentConfigWriter($projectDir);
+            $isNeedEnableNewModules = $this->checkInventoryApiModule($deploymentConfig);
             return new DisabledInventoryConfiguration(
                 $deploymentConfig,
                 $deploymentConfigWriter,
-                $this->io
+                $this->io,
+                $isNeedEnableNewModules
             );
         } else {
             return new NoChangesConfigurator($this->io);
@@ -122,5 +124,27 @@ class InventoryConfiguratorFactory
     {
         $configFilePool = new ConfigFilePool();
         return $configFilePool;
+    }
+
+
+    /**
+     * Search module Magento_InventoryApi in Config.php.
+     * Return true if module Magento_InventoryApi was found and value equal to 1.
+     *
+     * @param DeploymentConfig $deploymentConfig
+     * @return bool
+     */
+    private function checkInventoryApiModule(DeploymentConfig $deploymentConfig): bool
+    {
+        $inventoryApiModuleEnabled = false;
+
+        foreach ($deploymentConfig->get('modules') as $moduleName => $moduleEnabled) {
+            if ('Magento_InventoryApi' === $moduleName) {
+                $inventoryApiModuleEnabled = (bool)$moduleEnabled;
+                break;
+            }
+        }
+
+        return $inventoryApiModuleEnabled;
     }
 }

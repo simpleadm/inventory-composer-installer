@@ -28,20 +28,32 @@ class DisabledInventoryConfiguration implements InventoryConfiguratorInterface
      */
     private $io;
 
+    /**
+     * @var bool
+     */
+    private $isNeedEnableNewModules;
+
     public function __construct(
         DeploymentConfig $deploymentConfig,
         DeploymentConfig\Writer $deploymentConfigWriter,
-        IOInterface $io
+        IOInterface $io,
+        $isNeedEnableNewModules = false
     ) {
         $this->deploymentConfig = $deploymentConfig;
         $this->deploymentConfigWriter = $deploymentConfigWriter;
         $this->io = $io;
+        $this->isNeedEnableNewModules = $isNeedEnableNewModules;
     }
 
     public function configure(string $moduleName): void
     {
         if ($this->isModuleAlreadyConfigured($moduleName)) {
             $this->doNotChangeConfiguredValue($moduleName);
+            return;
+        }
+
+        if ($this->isNeedEnableModule($moduleName)) {
+            $this->enableModule($moduleName);
             return;
         }
 
@@ -72,6 +84,29 @@ class DisabledInventoryConfiguration implements InventoryConfiguratorInterface
         ), true);
     }
 
+    /**
+     * Enable module by name.
+     *
+     * @param string $moduleName
+     * @return void
+     * @throws \Magento\Framework\Exception\FileSystemException
+     */
+    private function enableModule(string $moduleName): void
+    {
+        $this->io->writeError(sprintf(
+            '    ...Enabling %s module because module Magento_InventoryApi is enabled.',
+            $moduleName
+        ), true);
+
+        $this->deploymentConfigWriter->saveConfig([
+            ConfigFilePool::APP_CONFIG => [
+                'modules' => [
+                    $moduleName => 1,
+                ]
+            ]
+        ]);
+    }
+
     private function disableModule($moduleName): void
     {
         $this->io->writeError(sprintf(
@@ -93,5 +128,31 @@ class DisabledInventoryConfiguration implements InventoryConfiguratorInterface
         $configKey = 'modules/' . $moduleName;
         $configValue = $this->deploymentConfig->get($configKey);
         return isset($configValue) ? (bool)$configValue : null;
+    }
+
+    /**
+     * Modules names, which need enable if module Magento_InventoryApi is enabled.
+     *
+     * @return array
+     */
+    private function getNewModulesNames(): array
+    {
+        return [
+            'Magento_InventoryDistanceBasedSourceSelection',
+            'Magento_InventoryDistanceBasedSourceSelectionAdminUi',
+            'Magento_InventoryDistanceBasedSourceSelectionApi',
+            'Magento_InventoryElasticsearch',
+        ];
+    }
+
+    /**
+     * Return true if module new and module InventoryApi is enabled.
+     *
+     * @param string $moduleName
+     * @return bool
+     */
+    private function isNeedEnableModule(string $moduleName): bool
+    {
+        return $this->isNeedEnableNewModules && in_array($moduleName, $this->getNewModulesNames());
     }
 }
